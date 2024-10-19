@@ -39,25 +39,25 @@ function HomePage() {
     "/fimozzBgTransp.png",
     "/fimozzBgTransp__min.png",
     "/fimozzBgTransp__max.png",
-  ]; // уровни и другие данные остались без изменений
+  ];
 
   const [units, setUnits] = React.useState([]);
   const sizeRef = useRef(90);
   const [points, setPoints] = React.useState(0);
   const pointsRef = useRef(0);
-  const [levelIndex, setLevelIndex] = React.useState(0); // Track user's current level
+  const [levelIndex, setLevelIndex] = React.useState(0);
   const levelRef = useRef(0);
+  const [prestige, setPrestige] = React.useState(0); // Track prestige level
+  const prestigeRef = useRef(0);
   const user = window.Telegram.WebApp.initDataUnsafe?.user;
 
-  // Cache data in localStorage
-  const cacheData = (points, levelIndex, timestamp) => {
+  const cacheData = (points, levelIndex, prestige, timestamp) => {
     localStorage.setItem(
       "pointsData_" + user.id,
-      JSON.stringify({ points, levelIndex, timestamp })
+      JSON.stringify({ points, levelIndex, prestige, timestamp })
     );
   };
 
-  // Load data from cache or Firebase
   useEffect(() => {
     if (user?.id) {
       const cachedData = JSON.parse(
@@ -73,20 +73,28 @@ function HomePage() {
         if (cachedData && localTimestamp > serverTimestamp) {
           setPoints(cachedData.points);
           setLevelIndex(cachedData.levelIndex);
+          setPrestige(cachedData.prestige);
           pointsRef.current = cachedData.points;
           levelRef.current = cachedData.levelIndex;
+          prestigeRef.current = cachedData.prestige;
         } else {
           setPoints(data?.points || 0);
           setLevelIndex(data?.levelIndex || 0);
+          setPrestige(data?.prestige || 0);
           pointsRef.current = data?.points || 0;
           levelRef.current = data?.levelIndex || 0;
-          cacheData(data?.points || 0, data?.levelIndex || 0, serverTimestamp);
+          prestigeRef.current = data?.prestige || 0;
+          cacheData(
+            data?.points || 0,
+            data?.levelIndex || 0,
+            data?.prestige || 0,
+            serverTimestamp
+          );
         }
       });
     }
   }, [user]);
 
-  // Tap function
   const tapFmz = (event, isTouch = false) => {
     sizeRef.current += 3;
     setTimeout(() => {
@@ -114,35 +122,61 @@ function HomePage() {
     }, 2000);
   };
 
-  // Level up handler
+  const prestigeHandler = () => {
+    // Reset points and levels, increase prestige
+    setPoints(0);
+    setLevelIndex(0);
+    pointsRef.current = 0;
+    levelRef.current = 0;
+
+    const newPrestige = prestigeRef.current + 1;
+    setPrestige(newPrestige);
+    prestigeRef.current = newPrestige;
+
+    // Update Firebase and localStorage
+    const refToDB = ref(database, "users/" + user.id);
+    const timestamp = Date.now();
+    update(refToDB, {
+      points: pointsRef.current,
+      levelIndex: levelRef.current,
+      prestige: newPrestige,
+      timestamp,
+    });
+    cacheData(pointsRef.current, levelRef.current, newPrestige, timestamp);
+  };
+
   const levelUp = () => {
-    if (pointsRef.current >= levelRequirements[levelRef.current]) {
-      // Subtract the points required for the current level first
+    if (levelIndex === levels.length - 1) {
+      prestigeHandler(); // Trigger prestige when reaching the final level
+    } else if (pointsRef.current >= levelRequirements[levelRef.current]) {
       setPoints(
         (prevPoints) => prevPoints - levelRequirements[levelRef.current]
       );
       pointsRef.current -= levelRequirements[levelRef.current];
 
-      // Now increment the levelIndex
       const newLevelIndex = levelRef.current + 1;
       setLevelIndex(newLevelIndex);
       levelRef.current = newLevelIndex;
 
-      // Update Firebase and localStorage
       const refToDB = ref(database, "users/" + user.id);
       const timestamp = Date.now();
       update(refToDB, {
         points: pointsRef.current,
         levelIndex: newLevelIndex,
+        prestige: prestigeRef.current,
         timestamp,
       });
-      cacheData(pointsRef.current, newLevelIndex, timestamp);
+      cacheData(
+        pointsRef.current,
+        newLevelIndex,
+        prestigeRef.current,
+        timestamp
+      );
     } else {
       console.log("Not enough points to level up.");
     }
   };
 
-  // Save data on unmount
   useEffect(() => {
     return () => {
       if (!user?.id) return;
@@ -152,10 +186,16 @@ function HomePage() {
       update(refToDB, {
         points: pointsRef.current,
         levelIndex: levelRef.current,
+        prestige: prestigeRef.current,
         timestamp,
       });
 
-      cacheData(pointsRef.current, levelRef.current, timestamp);
+      cacheData(
+        pointsRef.current,
+        levelRef.current,
+        prestigeRef.current,
+        timestamp
+      );
     };
   }, [user]);
 
@@ -175,7 +215,7 @@ function HomePage() {
       <h1 style={{ margin: "5px" }}>{levels[levelIndex]}</h1>
       <h3 style={{ margin: "5px" }}>{points} фимозов</h3>
       <img
-        src={images[0]}
+        src={images[prestige]} // Change image based on prestige level
         style={{
           width: `${sizeRef.current}vw`,
           marginBottom: "10px",
@@ -196,10 +236,15 @@ function HomePage() {
         }}>
         <div>
           <p style={{ fontWeight: "bold", color: "black" }}>
-            Повысить до уровня: {levels[levelIndex + 1]}
+            {levelIndex === levels.length - 1
+              ? "Достигнут финальный уровень! Повысить престиж?"
+              : `Повысить до уровня: ${levels[levelIndex + 1]}`}
           </p>
           <p style={{ fontWeight: "bold", color: "black" }}>
-            Нужно фимозов: {levelRequirements[levelIndex]}
+            Нужно фимозов:{" "}
+            {levelIndex === levels.length - 1
+              ? 0
+              : levelRequirements[levelIndex]}
           </p>
         </div>
         <button
@@ -208,17 +253,24 @@ function HomePage() {
             borderRadius: "10px",
             border: "none",
             background:
+              levelIndex === levels.length - 1 ||
               points >= levelRequirements[levelIndex]
                 ? "linear-gradient(162deg, rgba(255,188,0,1) 0%, rgba(254,0,184,1) 31%, rgba(0,104,255,1) 65%, rgba(1,255,0,1) 100%)"
                 : "gray",
             cursor:
+              levelIndex === levels.length - 1 ||
               points >= levelRequirements[levelIndex]
                 ? "pointer"
                 : "not-allowed",
           }}
-          disabled={points < levelRequirements[levelIndex]}
+          disabled={
+            points < levelRequirements[levelIndex] &&
+            levelIndex !== levels.length - 1
+          }
           onClick={levelUp}>
-          Повысить уровень
+          {levelIndex === levels.length - 1
+            ? "Повысить престиж"
+            : "Повысить уровень"}
         </button>
       </div>
 
