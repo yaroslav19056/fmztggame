@@ -1,0 +1,37 @@
+/* Основной контейнер */
+.App {
+  position: relative;
+}
+
+/* Стили для "единицы" */
+.unit {
+  position: absolute;
+  font-size: 24px;
+  color: white;
+  font-weight: bold;
+  pointer-events: none;
+  animation: flyUp 4s ease-out forwards, fadeOut 2s ease-out forwards;
+  transform: translate(-50%, -50%);
+}
+
+/* Анимация полета вверх */
+@keyframes flyUp {
+  0% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(-100px);
+  }
+}
+
+/* Анимация исчезновения */
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* HomePage.module.css */
