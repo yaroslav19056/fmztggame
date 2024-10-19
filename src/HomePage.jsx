@@ -26,7 +26,7 @@ function HomePage() {
 
   const levelRequirements = [
     50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400,
-    204800, 409600, 819200, 1638400, 1, 99999999999999999999999999999,
+    204800, 409600, 819200, 1638400, 1,
   ];
 
   const pointsPerTap = [
@@ -44,55 +44,57 @@ function HomePage() {
   const [units, setUnits] = React.useState([]);
   const sizeRef = useRef(90);
   const [points, setPoints] = React.useState(0);
-  const pointsRef = useRef(0); // для хранения текущих поинтов
+  const pointsRef = useRef(0);
+  const [levelIndex, setLevelIndex] = React.useState(0); // Track user's current level
+  const levelRef = useRef(0);
   const user = window.Telegram.WebApp.initDataUnsafe?.user;
 
-  // Функция для кеширования данных
-  const cacheData = (points, timestamp) => {
+  // Cache data in localStorage
+  const cacheData = (points, levelIndex, timestamp) => {
     localStorage.setItem(
       "pointsData_" + user.id,
-      JSON.stringify({ points, timestamp })
+      JSON.stringify({ points, levelIndex, timestamp })
     );
   };
 
-  // Загрузка данных из кеша или Firebase при монтировании компонента
+  // Load data from cache or Firebase
   useEffect(() => {
     if (user?.id) {
-      // Проверяем кешированные данные
       const cachedData = JSON.parse(
         localStorage.getItem("pointsData_" + user.id)
       );
 
-      const refToDB = ref(database, "users/" + user?.id);
+      const refToDB = ref(database, "users/" + user.id);
       onValue(refToDB, (snapshot) => {
         const data = snapshot.val();
         const serverTimestamp = data?.timestamp || 0;
         const localTimestamp = cachedData?.timestamp || 0;
 
-        // Если в кеше есть данные и они новее, чем на сервере, используем кеш
         if (cachedData && localTimestamp > serverTimestamp) {
           setPoints(cachedData.points);
+          setLevelIndex(cachedData.levelIndex);
           pointsRef.current = cachedData.points;
+          levelRef.current = cachedData.levelIndex;
         } else {
-          // Иначе используем данные Firebase и обновляем кеш
           setPoints(data?.points || 0);
+          setLevelIndex(data?.levelIndex || 0);
           pointsRef.current = data?.points || 0;
-          cacheData(data?.points || 0, serverTimestamp);
+          levelRef.current = data?.levelIndex || 0;
+          cacheData(data?.points || 0, data?.levelIndex || 0, serverTimestamp);
         }
       });
     }
   }, [user]);
 
+  // Tap function
   const tapFmz = (event, isTouch = false) => {
-    // Увеличение размера изображения на момент клика
     sizeRef.current += 3;
     setTimeout(() => {
       sizeRef.current = 90;
     }, 10);
 
-    // Обновление поинтов при каждом клике
     setPoints((prevPoints) => {
-      const newPoints = prevPoints + 1;
+      const newPoints = prevPoints + pointsPerTap[levelRef.current];
       pointsRef.current = newPoints;
       return newPoints;
     });
@@ -112,25 +114,48 @@ function HomePage() {
     }, 2000);
   };
 
-  // Обновление данных в Firebase при размонтировании компонента
+  // Level up handler
+  const levelUp = () => {
+    if (pointsRef.current >= levelRequirements[levelRef.current]) {
+      // Subtract the points required for the current level first
+      setPoints(
+        (prevPoints) => prevPoints - levelRequirements[levelRef.current]
+      );
+      pointsRef.current -= levelRequirements[levelRef.current];
+
+      // Now increment the levelIndex
+      const newLevelIndex = levelRef.current + 1;
+      setLevelIndex(newLevelIndex);
+      levelRef.current = newLevelIndex;
+
+      // Update Firebase and localStorage
+      const refToDB = ref(database, "users/" + user.id);
+      const timestamp = Date.now();
+      update(refToDB, {
+        points: pointsRef.current,
+        levelIndex: newLevelIndex,
+        timestamp,
+      });
+      cacheData(pointsRef.current, newLevelIndex, timestamp);
+    } else {
+      console.log("Not enough points to level up.");
+    }
+  };
+
+  // Save data on unmount
   useEffect(() => {
     return () => {
       if (!user?.id) return;
 
       const refToDB = ref(database, "users/" + user.id);
       const timestamp = Date.now();
+      update(refToDB, {
+        points: pointsRef.current,
+        levelIndex: levelRef.current,
+        timestamp,
+      });
 
-      try {
-        update(refToDB, {
-          points: pointsRef.current,
-          timestamp, // обновляем метку времени при сохранении данных
-        });
-
-        // Сохраняем данные в кеш с новой меткой времени
-        cacheData(pointsRef.current, timestamp);
-      } catch (error) {
-        console.error("Ошибка при обновлении поинтов:", error);
-      }
+      cacheData(pointsRef.current, levelRef.current, timestamp);
     };
   }, [user]);
 
@@ -147,7 +172,7 @@ function HomePage() {
         justifyContent: "space-around",
         flexDirection: "column",
       }}>
-      <h1 style={{ margin: "5px" }}>бмж фмзнк</h1>
+      <h1 style={{ margin: "5px" }}>{levels[levelIndex]}</h1>
       <h3 style={{ margin: "5px" }}>{points} фимозов</h3>
       <img
         src={images[0]}
@@ -171,10 +196,10 @@ function HomePage() {
         }}>
         <div>
           <p style={{ fontWeight: "bold", color: "black" }}>
-            Повысить до уровня: 52
+            Повысить до уровня: {levels[levelIndex + 1]}
           </p>
           <p style={{ fontWeight: "bold", color: "black" }}>
-            Нужно фимозов: 53
+            Нужно фимозов: {levelRequirements[levelIndex]}
           </p>
         </div>
         <button
@@ -183,9 +208,16 @@ function HomePage() {
             borderRadius: "10px",
             border: "none",
             background:
-              "linear-gradient(162deg, rgba(255,188,0,1) 0%, rgba(254,0,184,1) 31%, rgba(0,104,255,1) 65%, rgba(1,255,0,1) 100%)",
+              points >= levelRequirements[levelIndex]
+                ? "linear-gradient(162deg, rgba(255,188,0,1) 0%, rgba(254,0,184,1) 31%, rgba(0,104,255,1) 65%, rgba(1,255,0,1) 100%)"
+                : "gray",
+            cursor:
+              points >= levelRequirements[levelIndex]
+                ? "pointer"
+                : "not-allowed",
           }}
-          onClick={() => console.log("Повысить уровень")}>
+          disabled={points < levelRequirements[levelIndex]}
+          onClick={levelUp}>
           Повысить уровень
         </button>
       </div>
@@ -195,7 +227,7 @@ function HomePage() {
           key={unit.id}
           className={styles.unit}
           style={{ top: unit.y, left: unit.x }}>
-          +1
+          +{pointsPerTap[levelIndex]}
         </span>
       ))}
     </div>
