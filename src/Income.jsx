@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { ref, update, onValue } from "firebase/database";
+import { database } from "./firebase"; // Adjust the path to your Firebase config
 
 export default function Income() {
-  const cards = [
+  const initialCards = [
     {
       title: "Тягучесть",
       description: "Чем меньше тягучесть, тем лучше фимоз",
@@ -51,6 +53,58 @@ export default function Income() {
       income: 1,
     },
   ];
+
+  const [cards, setCards] = useState(initialCards);
+  const [points, setPoints] = useState(0); // Points from Firebase
+  const [profitPerHour, setProfitPerHour] = useState(0); // Profit per hour from Firebase
+  const user = window.Telegram.WebApp.initDataUnsafe?.user;
+
+  useEffect(() => {
+    if (user?.id) {
+      const userRef = ref(database, "users/" + user.id);
+      onValue(userRef, (snapshot) => {
+        const data = snapshot.val();
+        setPoints(data?.points || 0);
+        setProfitPerHour(data?.profitPerHour || 0); // Load profit per hour from Firebase
+
+        if (data?.cards) {
+          setCards(data.cards); // Load card data from Firebase
+        }
+      });
+    }
+  }, [user]);
+
+  const upgradeCard = (index) => {
+    const updatedCards = [...cards];
+    const card = updatedCards[index];
+
+    if (points >= card.price) {
+      // Deduct points and upgrade the card
+      const newPoints = points - card.price;
+      const newLevel = card.level + 1;
+
+      // Update card's price and income based on multiplier
+      card.price = (card.price * card.multiplier * 1.5).toFixed(3);
+      card.level = newLevel;
+      const incomeIncrease = card.income; // Calculate income increase
+      card.income = +(card.income * card.multiplier * 1.2).toFixed(3); // Increase income based on card level
+
+      // Update profitPerHour
+      const newProfitPerHour = profitPerHour + incomeIncrease;
+
+      setCards(updatedCards);
+      setPoints(newPoints);
+      setProfitPerHour(newProfitPerHour);
+
+      const userRef = ref(database, "users/" + user.id);
+      update(userRef, {
+        points: newPoints,
+        cards: updatedCards,
+        profitPerHour: newProfitPerHour, // Save the updated profit per hour
+      });
+    }
+  };
+
   return (
     <div
       style={{
@@ -142,16 +196,18 @@ export default function Income() {
                   {card.income} фмзв/час
                 </p>
                 <button
-                  disabled="true"
+                  disabled={points < card.price} // Disable if not enough points
                   style={{
                     padding: "10px",
                     borderRadius: "10px",
                     border: "none",
                     width: "100%",
-                    backgroundColor: "#cccccc",
+                    backgroundColor:
+                      points >= card.price ? "#ffd700" : "#cccccc",
                     marginBottom: "10px",
-                  }}>
-                  {card.price} фмзв
+                  }}
+                  onClick={() => upgradeCard(index)}>
+                  {Math.round(card.price)} фмзв
                 </button>
               </div>
             </div>

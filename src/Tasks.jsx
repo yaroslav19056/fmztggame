@@ -1,28 +1,56 @@
 import { useEffect, useState } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set, update, get } from "firebase/database";
 import { database } from "./firebase.jsx";
 import { ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
+  const [completedTasks, setCompletedTasks] = useState([]);
+  const userId = window.Telegram.WebApp.initDataUnsafe?.user?.id;
 
   useEffect(() => {
     const refToTasks = ref(database, "tasks");
+    const refToCompletedTasks = ref(database, `users/${userId}/completedTasks`);
 
+    // Fetch tasks from Firebase
     onValue(refToTasks, (snapshot) => {
       const tasks = snapshot.val();
-      setTasks(tasks);
+      setTasks(tasks || []);
     });
-  }, []);
 
-  function taskChecked(channel) {
-    toast.success(`Задание ${channel} выполнено`, {
+    // Fetch completed tasks for the user
+    onValue(refToCompletedTasks, (snapshot) => {
+      const completedTasks = snapshot.val() || [];
+      setCompletedTasks(completedTasks);
+    });
+  }, [userId]);
+
+  function taskChecked(channel, reward) {
+    toast.success(`Задание ${channel} выполнено, награда: ${reward} фмзв`, {
       duration: 3000,
     });
+
+    // Add reward to user's balance in Firebase
+    // Добавление награды к балансу пользователя в Firebase
+    const refToBalance = ref(database, `users/${userId}/points`);
+    get(refToBalance).then((snapshot) => {
+      const currentBalance = snapshot.val() || 0;
+
+      // Убедитесь, что текущий баланс — число, и добавьте награду
+      const newBalance =
+        typeof currentBalance === "number" ? currentBalance + reward : reward;
+
+      // Обновление значения без вложенной структуры
+      set(refToBalance, newBalance);
+    });
+
+    // Mark the task as completed in Firebase
+    const refToCompletedTasks = ref(database, `users/${userId}/completedTasks`);
+    set(refToCompletedTasks, [...completedTasks, channel]);
   }
 
-  async function checkSub(channel) {
+  async function checkSub(channel, reward) {
     const user = window.Telegram.WebApp.initDataUnsafe?.user;
     const refToInfo = await fetch(
       `https://api.telegram.org/bot7780848981:AAFc6poDpnPOnpLzvMUYYELrMZAmxubt8GQ/getChatMember?chat_id=@${channel}&user_id=${user.id}`
@@ -31,11 +59,15 @@ export default function Tasks() {
     refToInfo.json().then((data) => {
       if (data.result.status === "left" || data.result.status === "kicked") {
         window.Telegram.WebApp.close();
-        window.location.href = `https://t.me/${channel}`;
+        window.Telegram.WebApp.openTelegramLink(`https://t.me/${channel}`);
       } else {
-        taskChecked(channel);
+        taskChecked(channel, reward);
       }
     });
+  }
+
+  function isTaskCompleted(channel) {
+    return completedTasks.includes(channel);
   }
 
   return (
@@ -102,12 +134,15 @@ export default function Tasks() {
                 height: "50px",
                 borderRadius: "10px",
                 border: "none",
-                backgroundColor: "white",
+                backgroundColor: isTaskCompleted(task.channel)
+                  ? "#8f8f8f"
+                  : "white",
                 color: "white",
                 fontSize: "15px",
                 marginRight: "10px",
               }}
-              onClick={() => checkSub(task.channel)}>
+              onClick={() => checkSub(task.channel, task.reward)}
+              disabled={isTaskCompleted(task.channel)}>
               <ArrowRight color="#575757" strokeWidth={1.75} />
             </button>
           </div>

@@ -47,8 +47,10 @@ function HomePage() {
   const pointsRef = useRef(0);
   const [levelIndex, setLevelIndex] = React.useState(0);
   const levelRef = useRef(0);
-  const [prestige, setPrestige] = React.useState(0); // Track prestige level
+  const [prestige, setPrestige] = React.useState(0);
   const prestigeRef = useRef(0);
+  const [profitPerSecond, setProfitPerSecond] = React.useState(0); // Новое состояние для прибыли в секунду
+  const profitRef = useRef(0); // Реф для сохранения прибыли в секунду для доступа внутри интервала
   const user = window.Telegram.WebApp.initDataUnsafe?.user;
 
   const cacheData = (points, levelIndex, prestige, timestamp) => {
@@ -91,33 +93,52 @@ function HomePage() {
             serverTimestamp
           );
         }
+
+        // Загружаем значение profitPerHour из базы данных
+        const profitPerHour = data?.profitPerHour || 0;
+
+        // Проверим, что profitPerHour больше 0, чтобы избежать нулевого значения
+        if (profitPerHour > 0) {
+          const calculatedProfitPerSecond = profitPerHour / 3600;
+          setProfitPerSecond(calculatedProfitPerSecond);
+          profitRef.current = calculatedProfitPerSecond; // Обновляем реф для прибыли в секунду
+        }
       });
     }
   }, [user]);
 
-  const tapFmz = (event, isTouch = false) => {
+  const tapFmz = (event) => {
+    const touchPoints = event.touches; // Получаем все активные касания
     sizeRef.current += 3;
+
     setTimeout(() => {
       sizeRef.current = 90;
     }, 10);
 
-    setPoints((prevPoints) => {
-      const newPoints = prevPoints + pointsPerTap[levelRef.current];
-      pointsRef.current = newPoints;
-      return newPoints;
-    });
+    const newUnits = [];
 
-    const { clientX, clientY } = isTouch ? event.touches[0] : event;
-    const newUnit = {
-      id: Date.now() + clientX + clientY,
-      x: clientX,
-      y: clientY,
-    };
-    setUnits((prevUnits) => [...prevUnits, newUnit]);
+    for (let i = 0; i < touchPoints.length; i++) {
+      const touch = touchPoints[i];
+
+      setPoints((prevPoints) => {
+        const newPoints = prevPoints + pointsPerTap[levelRef.current];
+        pointsRef.current = newPoints;
+        return newPoints;
+      });
+
+      const newUnit = {
+        id: Date.now() + touch.clientX + touch.clientY,
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+      newUnits.push(newUnit);
+    }
+
+    setUnits((prevUnits) => [...prevUnits, ...newUnits]);
 
     setTimeout(() => {
       setUnits((prevUnits) =>
-        prevUnits.filter((unit) => unit.id !== newUnit.id)
+        prevUnits.filter((unit) => !newUnits.includes(unit))
       );
     }, 2000);
   };
@@ -178,6 +199,22 @@ function HomePage() {
   };
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      if (profitRef.current > 0) {
+        // Проверка, чтобы обновлять только при ненулевой прибыли
+        setPoints((prevPoints) => {
+          const newPoints = prevPoints + profitRef.current;
+          pointsRef.current = newPoints;
+          return newPoints;
+        });
+      }
+    }, 1000); // Инкремент каждые секунду
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Синхронизация данных при размонтировании
+  useEffect(() => {
     return () => {
       if (!user?.id) return;
 
@@ -199,6 +236,48 @@ function HomePage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (user?.id) {
+      const refToDB = ref(database, "users/" + user.id);
+
+      // Проверка наличия имени пользователя в базе данных
+      onValue(refToDB, (snapshot) => {
+        const data = snapshot.val();
+        if (!data?.firstName) {
+          // Если имя пользователя отсутствует, обновляем его и другие данные
+          update(refToDB, {
+            firstName: user.first_name,
+            lastName: user.last_name,
+            username: user.username,
+            id: user.id,
+          });
+        }
+      });
+    }
+  }, [user]);
+
+  function exitBtn() {
+    if (!user?.id) return;
+
+    const refToDB = ref(database, "users/" + user.id);
+    const timestamp = Date.now();
+    update(refToDB, {
+      points: pointsRef.current,
+      levelIndex: levelRef.current,
+      prestige: prestigeRef.current,
+      timestamp,
+    });
+
+    cacheData(
+      pointsRef.current,
+      levelRef.current,
+      prestigeRef.current,
+      timestamp
+    );
+    window.Telegram.WebApp.disableClosingConfirmation();
+    window.Telegram.WebApp.close();
+  }
+
   window.Telegram.WebApp.enableClosingConfirmation();
 
   return (
@@ -212,8 +291,21 @@ function HomePage() {
         justifyContent: "space-around",
         flexDirection: "column",
       }}>
+      <button
+        onClick={exitBtn}
+        style={{
+          margin: "5px",
+          backgroundColor: "rgba(219, 219, 219, 0.5)",
+          color: "white",
+          borderRadius: "10px",
+          border: "none",
+          height: "40px",
+          fontWeight: "bold",
+        }}>
+        Сохранить и выйти
+      </button>
       <h1 style={{ margin: "5px" }}>{levels[levelIndex]}</h1>
-      <h3 style={{ margin: "5px" }}>{points} фимозов</h3>
+      <h3 style={{ margin: "5px" }}>{points.toFixed(3)} фимозов</h3>
       <img
         src={images[prestige]} // Change image based on prestige level
         style={{
@@ -221,7 +313,7 @@ function HomePage() {
           marginBottom: "10px",
           marginTop: "10px",
         }}
-        onClick={tapFmz}
+        onTouchStart={tapFmz}
         alt="fmz"
       />
       <div

@@ -1,5 +1,5 @@
 import styles from "./BottomBar.module.css";
-import { Gem, Coins, House, ListChecks } from "lucide-react";
+import { Gem, Coins, House, ListChecks, ScrollText } from "lucide-react";
 
 export default function BottomBar({ onPageChange, currentPage }) {
   return (
@@ -80,6 +80,23 @@ export default function BottomBar({ onPageChange, currentPage }) {
         onClick={() => onPageChange("Airdrop")}>
         <Gem
           color={currentPage === "Airdrop" ? "#ffffff" : "#878787"}
+          strokeWidth={1.75}
+        />
+      </button>
+      <button
+        style={{
+          marginLeft: "10px",
+          marginRight: "10px",
+          height: "90%",
+          width: "20%",
+          borderRadius: "10px",
+          border: "none",
+          backgroundColor: "black",
+        }}
+        className={currentPage === "Quotes" ? styles.active : ""}
+        onClick={() => onPageChange("Quotes")}>
+        <ScrollText
+          color={currentPage === "Quotes" ? "#ffffff" : "#878787"}
           strokeWidth={1.75}
         />
       </button>
