@@ -84,10 +84,10 @@ export default function Income() {
       const newLevel = card.level + 1;
 
       // Update card's price and income based on multiplier
-      card.price = (card.price * card.multiplier * 1.5).toFixed(3);
+      card.price = (card.price * card.multiplier * 1.2).toFixed(3);
       card.level = newLevel;
       const incomeIncrease = card.income; // Calculate income increase
-      card.income = +(card.income * card.multiplier * 1.2).toFixed(3); // Increase income based on card level
+      card.income = +(card.income * card.multiplier * 1.22).toFixed(3); // Increase income based on card level
 
       // Update profitPerHour
       const newProfitPerHour = profitPerHour + incomeIncrease;

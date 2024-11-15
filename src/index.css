@@ -13,3 +13,25 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* Add this to your CSS file */
+.overlay {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.5s;
+}
+
+.overlay.fade-in {
+  opacity: 1;
+  visibility: visible;
+}
+
+.overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+
+button:active {
+  transform: scale(0.95);
+  transition: all 0.2s ease-in-out;
+}

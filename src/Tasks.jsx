@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ref, onValue, set, update, get } from "firebase/database";
+import { ref, onValue, set, get } from "firebase/database";
 import { database } from "./firebase.jsx";
 import { ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";

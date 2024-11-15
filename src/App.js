@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import HomePage from "./HomePage";
 import BottomBar from "./BottomBar";
-import Airdrop from "./Airdrop";
+import WheelPrizes from "./WheelPrizes";
 import Income from "./Income";
 import Tasks from "./Tasks";
 import toast from "react-hot-toast"; // Добавляем библиотеку для тостов
@@ -97,7 +97,7 @@ function App() {
       {currentPage === "Home" && <HomePage />}
       {currentPage === "Income" && <Income />}
       {currentPage === "Tasks" && <Tasks />}
-      {currentPage === "Airdrop" && <Airdrop />}
+      {currentPage === "WheelPrizes" && <WheelPrizes />}
       {currentPage === "Quotes" && <Quotes />}
       <BottomBar currentPage={currentPage} onPageChange={handlePageChange} />
     </div>

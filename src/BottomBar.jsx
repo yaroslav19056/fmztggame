@@ -1,5 +1,11 @@
 import styles from "./BottomBar.module.css";
-import { Gem, Coins, House, ListChecks, ScrollText } from "lucide-react";
+import {
+  LoaderPinwheel,
+  Coins,
+  House,
+  ListChecks,
+  ScrollText,
+} from "lucide-react";
 
 export default function BottomBar({ onPageChange, currentPage }) {
   return (
@@ -76,10 +82,10 @@ export default function BottomBar({ onPageChange, currentPage }) {
           border: "none",
           backgroundColor: "black",
         }}
-        className={currentPage === "Airdrop" ? styles.active : ""}
-        onClick={() => onPageChange("Airdrop")}>
-        <Gem
-          color={currentPage === "Airdrop" ? "#ffffff" : "#878787"}
+        className={currentPage === "WheelPrizes" ? styles.active : ""}
+        onClick={() => onPageChange("WheelPrizes")}>
+        <LoaderPinwheel
+          color={currentPage === "WheelPrizes" ? "#ffffff" : "#878787"}
           strokeWidth={1.75}
         />
       </button>

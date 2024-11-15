@@ -158,6 +158,7 @@ function HomePage() {
     const refToDB = ref(database, "users/" + user.id);
     const timestamp = Date.now();
     update(refToDB, {
+      spinAttempts: 0,
       points: pointsRef.current,
       levelIndex: levelRef.current,
       prestige: newPrestige,
